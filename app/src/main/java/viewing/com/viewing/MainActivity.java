@@ -7,7 +7,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.location.LocationManager;
 import android.os.Build;
 import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
@@ -30,15 +29,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String TAG = "MainActivity";
 
     private SensorManager mSensorManager;
-    private Sensor mSensor;
+    private Sensor mSensorLinearAcceleration;
+    private Sensor mSensorGyroscope;
 
     double[] gravity = new double[3];
+    double[] axis = new double[3];
+    double[] raw_accel = new double[3];
+    double[] raw_gyro = new double[3];
     double[] linear_acceleration = new double[3];
-    double magnitude = 0;
+
+    double rawAccelMagnitude = 0.0;
+    double accelMagnitude = 0.0;
+    double rawOmegaMagnitude = 0.0;
+    double omegaMagnitude = 0.;
     final double alpha = 0.8;
+    String speed = "";
     boolean start = false;
 
-    String filename;
     private Button button;
     private EditText editText;
     private TextView textView;
@@ -64,7 +71,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         button.setClickable(false);
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+        mSensorLinearAcceleration = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+        mSensorGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 
         System.out.println("Build.VERSION.SDK_INT >= 23 = " + Build.VERSION.SDK_INT);
         if (Build.VERSION.SDK_INT >= 23) {
@@ -96,28 +104,61 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        // In this example, alpha is calculated as t / (t + dT),
-        // where t is the low-pass filter's time-constant and
-        // dT is the event delivery rate.
 
-        // Isolate the force of gravity with the low-pass filter.
-        gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0];
-        gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
-        gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2];
+        if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION){
+            raw_accel[0] = event.values[0];
+            raw_accel[1] = event.values[1];
+            raw_accel[2] = event.values[2];
 
-        // Remove the gravity contribution with the high-pass filter.
-        linear_acceleration[0] = event.values[0] - gravity[0];
-        linear_acceleration[1] = event.values[1] - gravity[1];
-        linear_acceleration[2] = event.values[2] - gravity[2];
 
-        magnitude = Math.sqrt(Math.pow(linear_acceleration[0],2) + Math.pow(linear_acceleration[1],2) + Math.pow(linear_acceleration[2],2));
+            rawAccelMagnitude = Math.sqrt(Math.pow(raw_accel[0],2) + Math.pow(raw_accel[1],2) + Math.pow(raw_accel[2],2));
 
-        String msg = String.valueOf(linear_acceleration[0]) + "," + String.valueOf(linear_acceleration[1]) + "," + String.valueOf(linear_acceleration[2]) + "," + String.valueOf(magnitude)+"\n";
-        String log = String.valueOf(linear_acceleration[0]) + "\n" + String.valueOf(linear_acceleration[1]) + "\n" + String.valueOf(linear_acceleration[2]) + "\n" + String.valueOf(magnitude);
-        Log.d("Sensor Values x,y,z,m", log );
-        textView.setText(log);
+            gravity[0] = alpha * gravity[0] + (1 - alpha) * raw_accel[0];
+            gravity[1] = alpha * gravity[1] + (1 - alpha) * raw_accel[1];
+            gravity[2] = alpha * gravity[2] + (1 - alpha) * raw_accel[2];
 
-        writeToFile(msg,filename);
+            // Remove the gravity contribution with the high-pass filter.
+            linear_acceleration[0] = raw_accel[0] - gravity[0];
+            linear_acceleration[1] = raw_accel[1] - gravity[1];
+            linear_acceleration[2] = raw_accel[2] - gravity[2];
+
+            accelMagnitude = Math.sqrt(Math.pow(linear_acceleration[0],2) + Math.pow(linear_acceleration[1],2) + Math.pow(linear_acceleration[2],2));
+        }
+
+        if(event.sensor.getType() == Sensor.TYPE_GYROSCOPE){
+            raw_gyro[0] = event.values[0];
+            raw_gyro[1] = event.values[1];
+            raw_gyro[2] = event.values[2];
+
+            rawOmegaMagnitude = Math.sqrt(Math.pow(raw_gyro[0],2) + Math.pow(raw_gyro[1],2) + Math.pow(raw_gyro[2],2));
+
+
+            axis[0] = raw_gyro[0]/rawOmegaMagnitude;
+            axis[1] = raw_gyro[1]/rawOmegaMagnitude;
+            axis[2] = raw_gyro[2]/rawOmegaMagnitude;
+
+//            omegaMagnitude = Math.sqrt(Math.pow(axis[0],2) + Math.pow(axis[1],2) + Math.pow(axis[2],2));
+        }
+
+
+        // Calculate the angular speed of the sample
+
+        String sensor_raw = String.valueOf(speed + "," +raw_accel[0]) + "," + String.valueOf(raw_accel[1]) + "," + String.valueOf(raw_accel[2]) + "," + String.valueOf(rawAccelMagnitude)+","+
+                String.valueOf(raw_gyro[0]) + "," + String.valueOf(raw_gyro[1]) + "," + String.valueOf(raw_gyro[2]) + "," + String.valueOf(rawOmegaMagnitude)+"\n";
+        String log_raw = String.valueOf(speed + "\n" +raw_accel[0]) + "\n" + String.valueOf(raw_accel[1]) + "\n" + String.valueOf(raw_accel[2]) + "\n" + String.valueOf(rawAccelMagnitude)+
+                "\n"+String.valueOf(raw_gyro[0]) + "\n" + String.valueOf(raw_gyro[1]) + "\n" + String.valueOf(raw_gyro[2]) + "\n" + String.valueOf(rawOmegaMagnitude)+"\n";
+
+        String sensor_normalized = String.valueOf(speed + "," +linear_acceleration[0]) + "," + String.valueOf(linear_acceleration[1]) + "," + String.valueOf(linear_acceleration[2]) + "," + String.valueOf(accelMagnitude)+
+                ","+String.valueOf(axis[0]) + "," + String.valueOf(axis[1]) + "," + String.valueOf(axis[2]) + "," + String.valueOf(rawOmegaMagnitude)+"\n";
+
+        String log = String.valueOf(linear_acceleration[0]) + "\n" + String.valueOf(linear_acceleration[1]) + "\n" + String.valueOf(linear_acceleration[2]) + "\n" + String.valueOf(accelMagnitude)+
+                "\n"+String.valueOf(axis[0]) + "\n" + String.valueOf(axis[1]) + "\n" + String.valueOf(axis[2]) + "\n" + String.valueOf(rawOmegaMagnitude);
+
+        Log.d("Sensor Values",log_raw + log );
+        textView.setText(log_raw+"\n"+log);
+
+        writeToFile(sensor_normalized,"sensor_normalized_"+speed);
+        writeToFile(sensor_raw,"sensor_raw_"+speed);
     }
 
     @Override
@@ -135,8 +176,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         switch (v.getId()){
             case R.id.button1:
                 if(!start){
-                    mSensorManager.registerListener(this, mSensor, SensorManager.SENSOR_DELAY_NORMAL);
-                    filename = editText.getText().toString();
+                    mSensorManager.registerListener(this, mSensorLinearAcceleration, SensorManager.SENSOR_DELAY_NORMAL);
+                    mSensorManager.registerListener(this, mSensorGyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+                    speed = editText.getText().toString();
                     start = true;
                     button.setText("Stop");
                 }else{
@@ -151,7 +193,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void writeToFile(String data,String filename) {
 
-        String path = Environment.getExternalStorageDirectory() + File.separator + "Viewing";
+        String path = Environment.getExternalStorageDirectory() + File.separator + "Treadmill";
         // Create the folder.
         File folder = new File(path);
         if (!folder.exists()) {
