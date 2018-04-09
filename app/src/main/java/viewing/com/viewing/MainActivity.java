@@ -32,16 +32,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Sensor mSensorLinearAcceleration;
     private Sensor mSensorGyroscope;
 
-    double[] gravity = new double[3];
-    double[] axis = new double[3];
+    double[] normalized_gyro = new double[3];
     double[] raw_accel = new double[3];
     double[] raw_gyro = new double[3];
     double[] linear_acceleration = new double[3];
 
     double rawAccelMagnitude = 0.0;
-    double accelMagnitude = 0.0;
     double rawOmegaMagnitude = 0.0;
-    double omegaMagnitude = 0.;
     final double alpha = 0.8;
     String speed = "";
     boolean start = false;
@@ -106,59 +103,38 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onSensorChanged(SensorEvent event) {
 
         if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION){
-            raw_accel[0] = event.values[0];
-            raw_accel[1] = event.values[1];
-            raw_accel[2] = event.values[2];
-
-
+            raw_accel[0] = String.valueOf(event.values[0]).equalsIgnoreCase("NaN")? 0:event.values[0];
+            raw_accel[1] = String.valueOf(event.values[1]).equalsIgnoreCase("NaN")? 0:event.values[1];
+            raw_accel[2] = String.valueOf(event.values[2]).equalsIgnoreCase("NaN")? 0:event.values[2];
             rawAccelMagnitude = Math.sqrt(Math.pow(raw_accel[0],2) + Math.pow(raw_accel[1],2) + Math.pow(raw_accel[2],2));
-
-            gravity[0] = alpha * gravity[0] + (1 - alpha) * raw_accel[0];
-            gravity[1] = alpha * gravity[1] + (1 - alpha) * raw_accel[1];
-            gravity[2] = alpha * gravity[2] + (1 - alpha) * raw_accel[2];
-
-            // Remove the gravity contribution with the high-pass filter.
-            linear_acceleration[0] = raw_accel[0] - gravity[0];
-            linear_acceleration[1] = raw_accel[1] - gravity[1];
-            linear_acceleration[2] = raw_accel[2] - gravity[2];
-
-            accelMagnitude = Math.sqrt(Math.pow(linear_acceleration[0],2) + Math.pow(linear_acceleration[1],2) + Math.pow(linear_acceleration[2],2));
         }
 
         if(event.sensor.getType() == Sensor.TYPE_GYROSCOPE){
-            raw_gyro[0] = event.values[0];
-            raw_gyro[1] = event.values[1];
-            raw_gyro[2] = event.values[2];
-
+            raw_gyro[0] = String.valueOf(event.values[0]).equalsIgnoreCase("NaN")? 0:event.values[0];
+            raw_gyro[1] = String.valueOf(event.values[1]).equalsIgnoreCase("NaN")? 0:event.values[1];
+            raw_gyro[2] = String.valueOf(event.values[2]).equalsIgnoreCase("NaN")? 0:event.values[2];
             rawOmegaMagnitude = Math.sqrt(Math.pow(raw_gyro[0],2) + Math.pow(raw_gyro[1],2) + Math.pow(raw_gyro[2],2));
 
+            rawOmegaMagnitude = rawOmegaMagnitude == 0.0?1.0:rawOmegaMagnitude;
 
-            axis[0] = raw_gyro[0]/rawOmegaMagnitude;
-            axis[1] = raw_gyro[1]/rawOmegaMagnitude;
-            axis[2] = raw_gyro[2]/rawOmegaMagnitude;
-
-//            omegaMagnitude = Math.sqrt(Math.pow(axis[0],2) + Math.pow(axis[1],2) + Math.pow(axis[2],2));
+            normalized_gyro[0] = raw_gyro[0]/rawOmegaMagnitude;
+            normalized_gyro[1] = raw_gyro[1]/rawOmegaMagnitude;
+            normalized_gyro[2] = raw_gyro[2]/rawOmegaMagnitude;
         }
-
 
         // Calculate the angular speed of the sample
 
-        String sensor_raw = String.valueOf(speed + "," +raw_accel[0]) + "," + String.valueOf(raw_accel[1]) + "," + String.valueOf(raw_accel[2]) + "," + String.valueOf(rawAccelMagnitude)+","+
-                String.valueOf(raw_gyro[0]) + "," + String.valueOf(raw_gyro[1]) + "," + String.valueOf(raw_gyro[2]) + "," + String.valueOf(rawOmegaMagnitude)+"\n";
-        String log_raw = String.valueOf(speed + "\n" +raw_accel[0]) + "\n" + String.valueOf(raw_accel[1]) + "\n" + String.valueOf(raw_accel[2]) + "\n" + String.valueOf(rawAccelMagnitude)+
-                "\n"+String.valueOf(raw_gyro[0]) + "\n" + String.valueOf(raw_gyro[1]) + "\n" + String.valueOf(raw_gyro[2]) + "\n" + String.valueOf(rawOmegaMagnitude)+"\n";
 
-        String sensor_normalized = String.valueOf(speed + "," +linear_acceleration[0]) + "," + String.valueOf(linear_acceleration[1]) + "," + String.valueOf(linear_acceleration[2]) + "," + String.valueOf(accelMagnitude)+
-                ","+String.valueOf(axis[0]) + "," + String.valueOf(axis[1]) + "," + String.valueOf(axis[2]) + "," + String.valueOf(rawOmegaMagnitude)+"\n";
+        String sensor_normalized = String.valueOf(speed + "," +raw_accel[0]) + "," + String.valueOf(raw_accel[1]) + "," + String.valueOf(raw_accel[2]) + "," + String.valueOf(rawAccelMagnitude)+
+                ","+String.valueOf(normalized_gyro[0]) + "," + String.valueOf(normalized_gyro[1]) + "," + String.valueOf(normalized_gyro[2]) + "," + String.valueOf(rawOmegaMagnitude)+"\n";
 
-        String log = String.valueOf(linear_acceleration[0]) + "\n" + String.valueOf(linear_acceleration[1]) + "\n" + String.valueOf(linear_acceleration[2]) + "\n" + String.valueOf(accelMagnitude)+
-                "\n"+String.valueOf(axis[0]) + "\n" + String.valueOf(axis[1]) + "\n" + String.valueOf(axis[2]) + "\n" + String.valueOf(rawOmegaMagnitude);
+        String log = String.valueOf(raw_accel[0]) + "\n" + String.valueOf(raw_accel[1]) + "\n" + String.valueOf(raw_accel[2]) + "\n" + String.valueOf(rawAccelMagnitude)+
+                "\n"+String.valueOf(normalized_gyro[0]) + "\n" + String.valueOf(normalized_gyro[1]) + "\n" + String.valueOf(normalized_gyro[2]) + "\n" + String.valueOf(rawOmegaMagnitude);
 
-        Log.d("Sensor Values",log_raw + log );
-        textView.setText(log_raw+"\n"+log);
+        Log.d("Sensor Values",log );
+        textView.setText(log);
 
-        writeToFile(sensor_normalized,"sensor_normalized_"+speed);
-        writeToFile(sensor_raw,"sensor_raw_"+speed);
+        writeToFile(sensor_normalized,"sensor_data_"+speed);
     }
 
     @Override
